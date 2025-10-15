@@ -78,8 +78,14 @@ if st.sidebar.button("Go!"):
             
         else:
             st.error("Address not found!")
-#else:
-#     m = folium.Map(location=[59.3327, 18.0656], zoom_start=11)
-     
-# Display the map
+
+
+#Next steps:
+# Create tab Built environment
+#    -aggregate number of supermarkets, other shops, restaurants, cafes
+#    -a pie chart of sqare meter area: residential area, industry, retail, etc - from Open street map
+#    - a polygon of the selected radius
+
+
+
 
