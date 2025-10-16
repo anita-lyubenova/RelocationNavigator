@@ -54,11 +54,7 @@ if st.sidebar.button("Go!"):
                 'shop': {'types':['supermarket', 'convenience', 'bakery'],
                          'color':'green',
                          'icon':'shopping-cart'
-                         },
-                'leisure': {'types': ['dog_park', 'fitness_centre','ice_rink', 'nature_reserve'],
-                              'color':"blue",
-                              'icon': "star"
-                              }
+                         }
             }
             
             #subset the dictionary so that it contains only the keys and types = readable in ox.features_from_point()
