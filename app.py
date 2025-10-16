@@ -17,7 +17,8 @@ st.sidebar.markdown("## Sidebar")
 address = st.sidebar.text_input("Enter an address:", value ="Skaldevägen 60")
 POI_radius=st.sidebar.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
 
-
+address="Skaldevägen 60"
+POI_radius=500
 # Main --------------------------------------------------------
 
 # If user enters an address => find latitude and longitude
@@ -35,41 +36,43 @@ if st.sidebar.button("Go!"):
            
             # Add address marker
             folium.Marker([lat, lon], popup=address, icon=folium.Icon(color='red', icon='home')).add_to(m)
+            
     
             # Built environment: get POIs within 500m
             tags = {
-                'amenity': ['cafe', 'restaurant', 'bar', 'fast_food', 'pub'],
-                'shop': ['supermarket', 'convenience', 'bakery']
+                'amenity':{ 'types':['cafe', 'restaurant', 'bar', 'fast_food', 'pub'],
+                           'color':'orange',
+                           'icon':'cutlery'
+                           },
+                'shop': {'types':['supermarket', 'convenience', 'bakery'],
+                         'color':'green',
+                         'icon':'shopping-cart'
+                         }
             }
-            pois = ox.features_from_point((lat, lon), tags=tags, dist=POI_radius)
+            
+            #subset the dictionary so that it contains only the keys and types = readable in ox.features_from_point()
+            osm_tags = {key: info['types'] for key, info in tags.items()}
+            
+
+            pois = ox.features_from_point((lat, lon), tags=osm_tags, dist=POI_radius)
            
-            # Create separate FeatureGroups for layers
-            amenity_layer = folium.FeatureGroup(name="Amenities")
-            shop_layer = folium.FeatureGroup(name="Shops")
-    
-            # Filter amenities and add markers
-            amenity_pois = pois[pois['amenity'].notna()]
-            for idx, row in amenity_pois.iterrows():
-                lon_, lat_ = row.geometry.centroid.xy
-                folium.Marker(
-                    [lat_[0], lon_[0]],
-                    popup=row.get('name', 'Unnamed'),
-                    icon=folium.Icon(color='orange', icon='glyphicon glyphicon-cutlery')
-                ).add_to(amenity_layer)
-    
-            # Filter shops and add markers
-            shop_pois = pois[pois['shop'].notna()]
-            for idx, row in shop_pois.iterrows():
-                lon_, lat_ = row.geometry.centroid.xy
-                folium.Marker(
-                    [lat_[0], lon_[0]],
-                    popup=row.get('name', 'Unnamed'),
-                    icon=folium.Icon(color='green', icon='shopping-cart')
-                ).add_to(shop_layer)
-    
-            # Add layers to map
-            amenity_layer.add_to(m)
-            shop_layer.add_to(m)
+     
+            for key,item in tags.items():
+                feature_layer = folium.FeatureGroup(name=key)
+                
+               # Filter POIs for this key
+                filtered_pois = pois[pois[key].notna()]
+                
+                for idx, row in filtered_pois.iterrows():
+                    lon_, lat_ = row.geometry.centroid.xy
+                    folium.Marker(
+                        location=[lat_[0], lon_[0]],
+                        popup= f"<div style='font-size:12px; font-family:Arial; white-space:nowrap;'><b>{row[key].capitalize()}</b><br>{row.get('name', 'Unnamed')}",
+                        icon = folium.Icon(color=item['color'], icon=item['icon'])
+                        
+                        ).add_to(feature_layer)
+                         
+                feature_layer.add_to(m)
     
             # Add LayerControl for toggleable layers
             folium.LayerControl().add_to(m)
