@@ -9,6 +9,27 @@ from folium.features import GeoJson, GeoJsonPopup
 import pandas as pd
 import plotly.express as px
 
+geolocator = Nominatim(user_agent="Navigator")
+
+@st.cache_data(show_spinner=True, show_time = True)
+def geocode_address(address):
+    geolocator = Nominatim(user_agent="Navigator")
+    return geolocator.geocode(address)
+
+@st.cache_data(show_spinner=True, show_time = True)
+def get_osm_features(lat, lon, tags, dist):
+    return ox.features_from_point((lat, lon), tags=tags, dist=dist)
+
+@st.cache_data
+def load_pie_index():
+    df = pd.read_excel("OSM features.xlsx", sheet_name="pie_index")
+    df = df.dropna(subset=["key", "value"])
+    df["key"] = df["key"].astype(str).str.strip()
+    df["value"] = df["value"].astype(str).str.strip()
+    return df
+
+pie_index = load_pie_index()
+
 # -- Set page config
 apptitle = 'Navigator'
 st.set_page_config(page_title=apptitle,
@@ -29,9 +50,9 @@ if st.sidebar.button("Go!"):
     
 
     if address:
-        geolocator = Nominatim(user_agent="Navigator")
-        location = geolocator.geocode(address)
-    
+        
+        location = geocode_address(address)
+
         if location:
             lat, lon = location.latitude, location.longitude
             st.write(f"Coordinates: {lat}, {lon}")
@@ -64,7 +85,7 @@ if st.sidebar.button("Go!"):
                 'shop':True,
                 'building': True,
             }
-            all_features = ox.features_from_point((lat, lon),tags=tags0, dist=POI_radius)
+            all_features = get_osm_features(lat, lon, tags0, POI_radius)
            
             #add a columns indicating the key (tag_key) and value (tag_value) of the OSM feature
             tag_keys = list(tags0.keys())
@@ -139,14 +160,6 @@ if st.sidebar.button("Go!"):
             # Optional: sort by key and total area
             stats_df = stats_df.sort_values(["key", "total_area_m2"], ascending=[True, False]) 
             
-            
-            
-            #read and clean pie chart index, specifying the categories to be visualized and their links to teh key-value pairs
-            pie_index = pd.read_excel("OSM features.xlsx",sheet_name='pie_index')
-            # Clean up whitespace and drop empty rows
-            pie_index = pie_index.dropna(subset=["key", "value"])
-            pie_index["key"] = pie_index["key"].astype(str).str.strip()
-            pie_index["value"] = pie_index["value"].astype(str).str.strip()
             
             #Filter the pie index such that it only includes key-value pairs existing in the polygon features
 
