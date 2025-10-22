@@ -97,13 +97,7 @@ if st.sidebar.button("Go!"):
             folium.LayerControl().add_to(m)
             #st_folium(m, width=700, height=500)
             #st.write(pois[['amenity', 'shop', 'name', 'geometry']])
-            map_container = st.container()
-            piechart_container = st.container()
             
-           
-            with map_container:
-                st.subheader("Map with Points of interest")
-                st_folium(m, width=700, height=500)
 
 
             # Pie chart------------------------------------------------------------------------------------------------------
@@ -249,10 +243,17 @@ if st.sidebar.button("Go!"):
             fig.update_traces(textinfo="percent+label", pull=[0.05]*len(pie_summary))
            
          
-
-            with piechart_container:
+           
+                
+            col1,col2 = st.columns(2)    
+            
+            with col1:
+                st.subheader("Map with Points of interest")
+                st_folium(m, width=700, height=500)
+            with col2:
                 st.subheader("Land use distribution")
                 st.plotly_chart(fig,use_container_width=False, key="landuse_pie")
+                
         else:
             st.error("Address not found!")
 
