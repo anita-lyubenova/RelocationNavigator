@@ -28,6 +28,8 @@ def load_pie_index():
     df["value"] = df["value"].astype(str).str.strip()
     return df
 
+pie_index = load_pie_index()
+
 def clip_to_circle(gdf, lat, lon, radius):
     if gdf.crs is None:
         gdf = gdf.set_crs(4326)
@@ -37,7 +39,7 @@ def clip_to_circle(gdf, lat, lon, radius):
     circle = gpd.GeoSeries([center], crs=4326).to_crs(proj_crs).buffer(radius)
     return gpd.clip(gdf_proj, circle).to_crs(4326)
 
-pie_index = load_pie_index()
+
 
 def melt_tags(gdf, tag_keys):
     melted = (
@@ -127,7 +129,10 @@ if st.sidebar.button("Go!"):
                     total_area_m2 = ("area_m2", "sum"),
                     values_included=("value", lambda x: ", ".join(sorted(x.unique())))).reset_index()
             
-  
+            pie_data["values_included"] = (
+                pie_data["values_included"]           
+                .str.replace("_", " ")     
+            )
             #pie chart----------------------------------------------------
             fig = px.pie(
                 pie_data,
@@ -138,8 +143,10 @@ if st.sidebar.button("Go!"):
                     "values_included": True
                 },
              color_discrete_sequence=px.colors.qualitative.Set3,)
-            fig.update_traces(textinfo="percent+label", pull=[0.05]*len(pie_data))
-           
+            fig.update_traces(
+                textinfo="percent+label",
+                pull=[0.05]*len(pie_data),
+                hovertemplate="<b>%{label}</b><br>%{value:,.0f} m²<br>%{customdata}")
          
            
                 
