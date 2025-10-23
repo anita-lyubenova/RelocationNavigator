@@ -28,7 +28,28 @@ def load_pie_index():
     df["value"] = df["value"].astype(str).str.strip()
     return df
 
+def clip_to_circle(gdf, lat, lon, radius):
+    if gdf.crs is None:
+        gdf = gdf.set_crs(4326)
+    proj_crs = gdf.estimate_utm_crs()
+    gdf_proj = gdf.to_crs(proj_crs)
+    center = Point(lon, lat)
+    circle = gpd.GeoSeries([center], crs=4326).to_crs(proj_crs).buffer(radius)
+    return gpd.clip(gdf_proj, circle).to_crs(4326)
+
 pie_index = load_pie_index()
+
+def melt_tags(gdf, tag_keys):
+    melted = (
+        gdf[tag_keys]
+        .stack()
+        .reset_index()
+        .rename(columns={"level_2": "key", 0: "value"})
+    )
+    melted = melted.merge(gdf.reset_index()[["id", "geometry"]], on="id")
+    melted = melted.drop(columns="element")
+    melted = gpd.GeoDataFrame(melted, geometry="geometry", crs=gdf.crs)
+    return melted
 
 # -- Set page config
 apptitle = 'Navigator'
@@ -87,121 +108,28 @@ if st.sidebar.button("Go!"):
             }
             all_features = get_osm_features(lat, lon, tags0, POI_radius)
            
-            #add a columns indicating the key (tag_key) and value (tag_value) of the OSM feature
-            tag_keys = list(tags0.keys())
-            
-            def detect_key_and_value(row):
-                for key in tag_keys:
-                    if pd.notna(row.get(key)):
-                        return key, row[key]
-                return None, None
-            
-            all_features['tag_key'], all_features['tag_value'] = zip(*all_features.apply(detect_key_and_value, axis=1))
+            all_features=melt_tags(all_features, tags0.keys())
             
             polygon_features = all_features[all_features.geometry.geom_type.isin(["Polygon", "MultiPolygon"])]
             
-            
-           
-            #Clip polygons within the circle-----------------------------------
-            # 0 Ensure the polygons have a CRS ---
-            if polygon_features.crs is None:
-                polygon_features = polygon_features.set_crs("EPSG:4326")
-            
-            #1. Pick a metric CRS (for buffer in meters) ---
-            proj_crs = polygon_features.estimate_utm_crs()
-            
-            #2 Project both polygons and center point ---
-            pf_proj = polygon_features.to_crs(proj_crs)
-            center = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326").to_crs(proj_crs).iloc[0]
-            
-            #3Create the circular polygon (real geometry in meters) ---
-            circle_poly = center.buffer(POI_radius)
-            
-            # 4 Convert it into a GeoDataFrame ---
-            circle_gdf = gpd.GeoDataFrame({"geometry": [circle_poly]}, crs=proj_crs)
-            
-            # 5 CLIP polygons to circle (this is the key part) ---
-            clipped_proj = gpd.clip(pf_proj, circle_gdf)
-            
-            # 6 Reproject back to WGS84 for Folium ---
-            clipped = clipped_proj.to_crs("EPSG:4326")
-            circle_gdf_wgs = circle_gdf.to_crs("EPSG:4326")
+            clipped=clip_to_circle(gdf=polygon_features, lat=lat, lon=lon, radius=POI_radius)
             
             #Copmute square meter area per key and value-----------------------
             # Project to metric CRS for accurate areas
             proj_crs = clipped.estimate_utm_crs()
-            gdf_proj = clipped.to_crs(proj_crs)
-            gdf_proj["area_m2"] = gdf_proj.geometry.area
+            clipped = clipped.to_crs(proj_crs)
+            clipped["area_m2"] = clipped.geometry.area
+           
+            pie_data = clipped.merge(
+                pie_index, on=["key", "value"], how="left"
+                ).groupby(["pie_cat"]).agg(
+                    total_area_m2 = ("area_m2", "sum"),
+                    values_included=("value", lambda x: ", ".join(sorted(x.unique())))).reset_index()
             
-            # List of keys
-            keys = list(tags0.keys())
-            
-            # Store results
-            detailed_stats = []
-            
-            for key in keys:
-                subset = gdf_proj[gdf_proj[key].notna()]
-                if len(subset) == 0:
-                    continue
-                grouped = subset.groupby(key).agg(
-                    count=("geometry", "count"),
-                    total_area_m2=("area_m2", "sum")
-                ).reset_index()
-                grouped["total_area_m2"] = grouped["total_area_m2"].round(0).astype(int)
-                grouped["key"] = key
-                grouped = grouped.rename(columns={key: "value"})  # rename grouped column to "value"
-                detailed_stats.append(grouped)
-            # Combine all keys
-            stats_df = pd.concat(detailed_stats, ignore_index=True)
-            
-            # Reorder columns
-            stats_df = stats_df[["key", "value", "count", "total_area_m2"]]
-            
-            # Optional: sort by key and total area
-            stats_df = stats_df.sort_values(["key", "total_area_m2"], ascending=[True, False]) 
-            
-            
-            #Filter the pie index such that it only includes key-value pairs existing in the polygon features
-
-            available_pairs = []
-            for key in polygon_features.columns:
-                if key in pie_index["key"].unique():
-                    valid_values = polygon_features[key].dropna().unique()
-                    available_pairs.extend([(key, v) for v in valid_values])
-            
-            available_df = pd.DataFrame(available_pairs, columns=["key", "value"])
-            
-            # --- 3️⃣ Filter pie_index for only those key-value pairs present in polygon_features ---
-            pie_index_filtered = pie_index.merge(available_df, on=["key", "value"], how="inner")
-                
-            
-            #Create pie chart data-----------------------------------------
-            # Merge on key/value to get pie category for each landuse/building type
-            pie_data = stats_df.merge(pie_index_filtered, on=["key", "value"], how="inner")
-            
-            # Group by pie category and value to compute stats
-            pie_detail = (
-                pie_data.groupby(["pie_cat", "value"], as_index=False)
-                .agg(total_area_m2=("total_area_m2", "sum"))
-                .sort_values(["pie_cat", "total_area_m2"], ascending=[True, False])
-            )
-            
-            # Then aggregate to the pie category level (for pie chart totals)
-            pie_summary = (
-                pie_detail.groupby("pie_cat", as_index=False)
-                .agg(
-                    total_area_m2=("total_area_m2", "sum"),
-                    values_included=("value", lambda x: ", ".join(sorted(x.unique())))
-                )
-                .sort_values("total_area_m2", ascending=False)
-            )
-            
-            # Clean up number formatting
-            pie_summary["total_area_m2"] = pie_summary["total_area_m2"].round(0).astype(int)
-            
+  
             #pie chart----------------------------------------------------
             fig = px.pie(
-                pie_summary,
+                pie_data,
                 names="pie_cat",
                 values="total_area_m2",
                 title="Area by Landuse Category",
@@ -209,7 +137,7 @@ if st.sidebar.button("Go!"):
                     "values_included": True
                 },
              color_discrete_sequence=px.colors.qualitative.Set3,)
-            fig.update_traces(textinfo="percent+label", pull=[0.05]*len(pie_summary))
+            fig.update_traces(textinfo="percent+label", pull=[0.05]*len(pie_data))
            
          
            
