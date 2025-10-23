@@ -106,6 +106,7 @@ if st.sidebar.button("Go!"):
                 'shop':True,
                 'building': True,
             }
+     
             all_features = get_osm_features(lat, lon, tags0, POI_radius)
            
             all_features=melt_tags(all_features, tags0.keys())
