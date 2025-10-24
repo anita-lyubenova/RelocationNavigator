@@ -9,6 +9,7 @@ from folium.features import GeoJson, GeoJsonPopup
 import pandas as pd
 import plotly.express as px
 
+
 geolocator = Nominatim(user_agent="Navigator")
 
 @st.cache_data(show_spinner=True, show_time = True)
@@ -157,8 +158,14 @@ if st.sidebar.button("Go!"):
                 st_folium(m, width=700, height=500)
             with col2:
                 st.subheader("Land use distribution")
-                st.plotly_chart(fig,use_container_width=False, key="landuse_pie")
+                st.plotly_chart(fig,
+                                use_container_width=False,
+                                key="landuse_pie",
+                                on_select ="rerun")
                 
+        
+
+
         else:
             st.error("Address not found!")
 
