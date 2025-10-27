@@ -142,21 +142,16 @@ if st.sidebar.button("Go!"):
                 names="pie_cat",
                 values="total_area_m2",
                 title="Area by Landuse Category",
-                # hover_data={
-                #     "values_included": True
-                # },
+                hover_data={
+                    "values_included": True
+                },
                 color_discrete_sequence=px.colors.qualitative.Set3)
-            # fig.update_traces(
-            #     textinfo="percent+label",
-            #     pull=[0.05]*len(pie_data),
-            #     hovertemplate="<b>%{label}</b><br>%{value:,.0f} m²<br>%{customdata}")
+            fig.update_traces(
+                textinfo="percent+label",
+                pull=[0.05]*len(pie_data),
+                hovertemplate="<b>%{label}</b><br>%{value:,.0f} m²<br>%{customdata}")
          
-            # fig.update_traces(
-            #     textinfo="percent+label",
-            #     pull=[0.05] * len(pie_data),
-            #     # customdata=pie_data["total_area_m2"],  # Add this line
-            #     # hovertemplate="<b>%{label}</b><br>%{value:,.0f} m²<br>%{customdata}",
-            #  )
+          
 
                 
             col1,col2 = st.columns(2)    
@@ -166,14 +161,11 @@ if st.sidebar.button("Go!"):
                 st_folium(m, width=700, height=500)
             with col2:
                 st.subheader("Land use distribution")
-                # st.plotly_chart(fig,
-                #                 use_container_width=False,
-                #                 key="landuse_pie",
-                #                 on_select ="rerun")
-                clicked = plotly_events(fig, click_event=True, select_event=False, override_height=500)
-
-                if clicked:
-                    st.write("You clicked:", clicked[0]['label'])
+                st.plotly_chart(fig,
+                                use_container_width=False,
+                                key="landuse_pie",
+                                on_select ="rerun")
+                
 
 
         
