@@ -5,10 +5,9 @@ from geopy.geocoders import Nominatim
 import osmnx as ox
 import geopandas as gpd
 from shapely.geometry import Point
-from folium.features import GeoJson, GeoJsonPopup
 import pandas as pd
 import plotly.express as px
-from streamlit_plotly_events import plotly_events
+
 
 
 
