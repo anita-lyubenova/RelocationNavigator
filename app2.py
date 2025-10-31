@@ -22,8 +22,8 @@ def get_osm_features(lat, lon, tags, dist):
     return ox.features_from_point((lat, lon), tags=tags, dist=dist)
 
 @st.cache_data
-def load_pie_index():
-    df = pd.read_excel("OSM features.xls", sheet_name="pie_index")
+def load_pie_index(sheet):
+    df = pd.read_excel("OSM features.xls", sheet_name=sheet)
     df = df.dropna(subset=["key", "value"])
     df["key"] = df["key"].astype(str).str.strip()
     df["value"] = df["value"].astype(str).str.strip()
@@ -55,7 +55,7 @@ def melt_tags(gdf, tag_keys):
     return melted
 
 #get pie index 
-pie_index = load_pie_index()
+pie_index = load_pie_index("pie_index")
 #Create a color to category mapping
 unique_cats = pie_index["pie_cat"].unique()
 #palette = px.colors.qualitative.Pastel1+px.colors.qualitative.Pastel2
@@ -65,6 +65,12 @@ color_lookup = {
     cat: palette[i % len(palette)]
     for i, cat in enumerate(sorted(unique_cats))
 }
+
+ms_index  = load_pie_index("Multiselect")
+ms_index = ms_index[ms_index['Multiselect'].notna()]
+
+ms_cats = ms_index['Category'].unique()
+
 
 fig_height=650
 # -- Set page config
@@ -87,6 +93,19 @@ div[data-testid = 'stMainBlockContainer']{padding: 0rem 0rem 0rem 1rem;}
 st.markdown(nopad, unsafe_allow_html=True)
 
 
+vertical_pills = """<style>
+div[data-testid = 'stMarkdownContainer']{display: grid;} 
+</style>
+"""
+
+vertical_pills = """
+<style>
+div[role='group'][data-baseweb='button-group'] {display: grid !important;}
+</style>
+"""
+
+# stMarkdownContainer
+
 # Sidebar ----------------------------------------------------
 # st.sidebar.markdown("## Sidebar")
 # address = st.sidebar.text_input("Enter an address:", value ="Skaldevägen 60")
@@ -100,7 +119,18 @@ with col_address:
     address = st.text_input("Enter an address:", value ="Skaldevägen 60")
     POI_radius=st.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
 
+with col_features:
+    ms_input_food = st.pills(label = "Food & Drinks",
+                             options = ms_index.loc[ms_index["Category"] == "Food & Drinks",'Multiselect'],
+                             key="poi_food_input",
+                             selection_mode="multi")
+    st.markdown(vertical_pills, unsafe_allow_html=True)
     
+
+    #PoI_input = st.multiselect(label="What services are important?", options = ms_index['Multiselect'], key = "poi_select")
+
+
+        
 # cont_address=st.container(width=300)
 # address = col_address.text_input("Enter an address:", value ="Skaldevägen 60")
 # POI_radius=col_address.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
