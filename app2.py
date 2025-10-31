@@ -7,9 +7,9 @@ import geopandas as gpd
 from shapely.geometry import Point
 import pandas as pd
 import plotly.express as px
-
-
-
+#import xlrd
+#from folium import GeoJson, GeoJsonTooltip
+import matplotlib.pyplot as plt
 
 geolocator = Nominatim(user_agent="Navigator")
 
@@ -24,13 +24,13 @@ def get_osm_features(lat, lon, tags, dist):
 
 @st.cache_data
 def load_pie_index():
-    df = pd.read_excel("OSM features.xlsx", sheet_name="pie_index")
+    df = pd.read_excel("OSM features.xls", sheet_name="pie_index")
     df = df.dropna(subset=["key", "value"])
     df["key"] = df["key"].astype(str).str.strip()
     df["value"] = df["value"].astype(str).str.strip()
     return df
 
-pie_index = load_pie_index()
+
 
 def clip_to_circle(gdf, lat, lon, radius):
     if gdf.crs is None:
@@ -55,6 +55,19 @@ def melt_tags(gdf, tag_keys):
     melted = gpd.GeoDataFrame(melted, geometry="geometry", crs=gdf.crs)
     return melted
 
+#get pie index 
+pie_index = load_pie_index()
+#Create a color to category mapping
+unique_cats = pie_index["pie_cat"].unique()
+#palette = px.colors.qualitative.Pastel1+px.colors.qualitative.Pastel2
+#palette = plt.colormaps.get('Set3').colors
+palette = px.colors.qualitative.Light24
+color_lookup = {
+    cat: palette[i % len(palette)]
+    for i, cat in enumerate(sorted(unique_cats))
+}
+
+fig_height=650
 # -- Set page config
 apptitle = 'Navigator'
 st.set_page_config(page_title=apptitle,
@@ -83,24 +96,7 @@ if st.sidebar.button("Go!"):
             st.write(f"Coordinates: {lat}, {lon}")
             
             
-            #Map --------------------------------------------------------------
-            m = folium.Map(location=[lat, lon], zoom_start=14)
            
-            # Add address marker
-            folium.Marker([lat, lon], popup=address, icon=folium.Icon(color='red', icon='home')).add_to(m)
-            folium.Circle(
-                    location=[lat, lon],
-                    radius=POI_radius,  # in meters
-                    color='blue',       # outline color
-                    fill=True,
-                    fill_color='blue',  # fill color
-                    fill_opacity=0.2,   # transparency (0 = invisible, 1 = opaque)
-                    weight=2            # outline thickness
-                    ).add_to(m)
-             # amenity and shops POIs within 500m
-           
-
-            # Pie chart------------------------------------------------------------------------------------------------------
             # Built environment: get POIs within 500m
             tags0 = {
                 'landuse': True,   # True → all landuse values
@@ -110,11 +106,12 @@ if st.sidebar.button("Go!"):
                 'shop':True,
                 'building': True,
             }
-     
-            all_features = get_osm_features(lat, lon, tags0, POI_radius)
-           
-            all_features=melt_tags(all_features, tags0.keys())
             
+            all_features = get_osm_features(lat, lon, tags0, POI_radius)
+            #transform to long format
+            all_features=melt_tags(all_features, tags0.keys())
+            # Pie chart------------------------------------------------------------------------------------------------------
+            # get only polygons
             polygon_features = all_features[all_features.geometry.geom_type.isin(["Polygon", "MultiPolygon"])]
             
             clipped=clip_to_circle(gdf=polygon_features, lat=lat, lon=lon, radius=POI_radius)
@@ -124,46 +121,87 @@ if st.sidebar.button("Go!"):
             proj_crs = clipped.estimate_utm_crs()
             clipped = clipped.to_crs(proj_crs)
             clipped["area_m2"] = clipped.geometry.area
-           
-            pie_data = clipped.merge(
-                pie_index, on=["key", "value"], how="left"
-                ).groupby(["pie_cat"]).agg(
-                    total_area_m2 = ("area_m2", "sum"),
-                    values_included=("value", lambda x: ", ".join(sorted(x.unique())))).reset_index()
             
-            pie_data["values_included"] = (
-                pie_data["values_included"]           
-                .str.replace("_", " ")     
-            )
+            pie_data0 = clipped.merge(pie_index, on=["key", "value"], how="left")
+            #pie_data0['pie_cat'] =pie_data0['pie_cat'].fillna('other')
+            pie_data0 =pie_data0[pie_data0['pie_cat'].notna()] #remove polygons that are not in the pie index
+            
+            pie_data = pie_data0.groupby(["pie_cat"]).agg(
+                total_area_m2 = ("area_m2", "sum"),
+                values_included=("value", lambda x: ", ".join(sorted(x.unique())))).reset_index() #concantenate all values within the pie_category
+
+            pie_data["values_included"] = (pie_data["values_included"].str.replace("_", " ")) #remove underscores from the column (for the popup)
+            
             #pie chart----------------------------------------------------
             fig = px.pie(
                 pie_data,
                 names="pie_cat",
                 values="total_area_m2",
-                title="Area by Landuse Category",
-                hover_data={
-                    "values_included": True
-                },
-                color_discrete_sequence=px.colors.qualitative.Set3)
+                hover_data=["values_included"],
+                color='pie_cat',
+                color_discrete_map=color_lookup)
             fig.update_traces(
                 textinfo="percent+label",
                 pull=[0.05]*len(pie_data),
                 hovertemplate="<b>%{label}</b><br>%{value:,.0f} m²<br>%{customdata}")
+            
+            fig.update_layout(height=fig_height)
          
-          
-
+           #Map --------------------------------------------------------------
+            keys = pie_data.sort_values("total_area_m2", ascending=False)["pie_cat"].unique()
+            m = folium.Map(location=[lat, lon], zoom_start=14)         
+            # Add address marker
+            folium.Marker([lat, lon], popup=address, icon=folium.Icon(color='red', icon='home')).add_to(m)
+            folium.Circle(
+                location=[lat, lon],
+                radius=POI_radius,  # in meters
+                color='red',       
+                fill=False,
+                weight=2            
+                ).add_to(m)
+            
+            for index,key in enumerate(keys):
+                print(key)
+                if key in keys:
+                    polygon_layer = folium.FeatureGroup(name=key)
+                    #fillcolor = px.colors.qualitative.Set3[index]
+                    
+                    fillcolor = color_lookup.get(key, 'gray') 
+                    print(fillcolor)
+            
+                    # Filter POIs for this key
+                    filtered = pie_data0[pie_data0['pie_cat']==key]
+                    folium.GeoJson(data=filtered, 
+                                       style_function=lambda x, color=fillcolor: {"fillColor": color,
+                                                                 'color': 'black',
+                                                                 'weight': 0.3,
+                                                                 'fillOpacity': 0.5
+                                                                },
+                                       popup=folium.GeoJsonPopup(
+                                            fields=['pie_cat' ,'key', 'value'],
+                                            aliases=['In pie chart', 'OSM key', 'OSM value']
+                                        )).add_to(polygon_layer)
+            
+                    polygon_layer.add_to(m)
+                  
+                else:
+                    continue
                 
-            col1,col2 = st.columns(2)    
+            folium.LayerControl().add_to(m)
+            
+            #st_folium(m)
+            col1,col2 = st.columns(2, gap="small", border=True)    
             
             with col1:
                 st.subheader("Map with Points of interest")
-                st_folium(m, width=700, height=500)
+                st_folium(m)
+                st.write(color_lookup)
             with col2:
                 st.subheader("Land use distribution")
                 st.plotly_chart(fig,
-                                use_container_width=False,
+                                use_container_width=True,
                                 key="landuse_pie",
-                                on_select ="rerun")
+                                config = {'height': fig_height})
                 
 
 
