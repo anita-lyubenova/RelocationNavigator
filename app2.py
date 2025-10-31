@@ -117,10 +117,6 @@ st.markdown(
 )
 
 
-# Sidebar ----------------------------------------------------
-# st.sidebar.markdown("## Sidebar")
-# address = st.sidebar.text_input("Enter an address:", value ="Skaldevägen 60")
-# POI_radius=st.sidebar.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
 
 # Main --------------------------------------------------------
 cont_input = st.container()
@@ -133,7 +129,7 @@ with col_address:
 with col_features:
    
     
-    selected_values = {}
+    selected_poi = []
 
     # Loop through all categories
     for category in ms_index["Category"].unique():
@@ -148,22 +144,26 @@ with col_features:
         )
         
         # Store the selected values
-        selected_values[category] = selected
-
-    st.write(selected_values)
+        selected_poi.extend(selected)
+        
 
     #PoI_input = st.multiselect(label="What services are important?", options = ms_index['Multiselect'], key = "poi_select")
+tags=ms_index[ms_index['Multiselect'].isin(selected_poi)][["key", "value"]].groupby("key")["value"].apply(list).to_dict()
 
+#Built environment: get POIs within 500m
+tags0 = {
+    'landuse': True,   # True → all landuse values
+    'natural': True,   # all natural features
+    'leisure': True,    # all leisure features
+    'amenity':True,
+   # 'shop':True,
+    'building': True,
+}
 
-        
-# cont_address=st.container(width=300)
-# address = col_address.text_input("Enter an address:", value ="Skaldevägen 60")
-# POI_radius=col_address.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
 
 # If user enters an address => find latitude and longitude
 if st.button("Go!"):
     
-
     if address:
         
         location = geocode_address(address)
@@ -172,19 +172,9 @@ if st.button("Go!"):
             lat, lon = location.latitude, location.longitude
             st.write(f"Coordinates: {lat}, {lon}")
             
-            
-           
-            # Built environment: get POIs within 500m
-            tags0 = {
-                'landuse': True,   # True → all landuse values
-                'natural': True,   # all natural features
-                'leisure': True,    # all leisure features
-                'amenity':True,
-                'shop':True,
-                'building': True,
-            }
-            
             all_features = get_osm_features(lat, lon, tags0, POI_radius)
+            ms_poi = get_osm_features(lat, lon, tags, POI_radius)
+            
             #transform to long format
             all_features=melt_tags(all_features, tags0.keys())
             # Pie chart------------------------------------------------------------------------------------------------------
@@ -272,6 +262,7 @@ if st.button("Go!"):
             with col1:
                 st.subheader("Map with Points of interest")
                 st_folium(m)
+                st.write(ms_poi)
             with col2:
                 st.subheader("Land use distribution")
                 st.plotly_chart(fig,
