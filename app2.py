@@ -9,7 +9,6 @@ import pandas as pd
 import plotly.express as px
 #import xlrd
 #from folium import GeoJson, GeoJsonTooltip
-import matplotlib.pyplot as plt
 
 geolocator = Nominatim(user_agent="Navigator")
 
@@ -75,6 +74,18 @@ st.set_page_config(page_title=apptitle,
                    initial_sidebar_state="expanded")
 
 st.title("Relocation Navigator 2")
+
+
+
+
+## applying style
+nopad = """<style>
+div[data-testid = 'stMainBlockContainer']{padding: 0rem 0rem 0rem 1rem;} 
+</style>
+"""
+
+st.markdown(nopad, unsafe_allow_html=True)
+
 
 # Sidebar ----------------------------------------------------
 st.sidebar.markdown("## Sidebar")
@@ -195,7 +206,6 @@ if st.sidebar.button("Go!"):
             with col1:
                 st.subheader("Map with Points of interest")
                 st_folium(m)
-                st.write(color_lookup)
             with col2:
                 st.subheader("Land use distribution")
                 st.plotly_chart(fig,
