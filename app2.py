@@ -71,7 +71,7 @@ fig_height=650
 apptitle = 'Navigator'
 st.set_page_config(page_title=apptitle,
                    layout="wide",
-                   initial_sidebar_state="expanded")
+                   initial_sidebar_state="collapsed")
 
 st.title("Relocation Navigator 2")
 
@@ -88,14 +88,25 @@ st.markdown(nopad, unsafe_allow_html=True)
 
 
 # Sidebar ----------------------------------------------------
-st.sidebar.markdown("## Sidebar")
-address = st.sidebar.text_input("Enter an address:", value ="Skaldevägen 60")
-POI_radius=st.sidebar.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
+# st.sidebar.markdown("## Sidebar")
+# address = st.sidebar.text_input("Enter an address:", value ="Skaldevägen 60")
+# POI_radius=st.sidebar.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
 
 # Main --------------------------------------------------------
+cont_input = st.container()
+col_address, col_features = cont_input.columns(spec= [0.3, 0.7], gap="small", border=True)
+
+with col_address:
+    address = st.text_input("Enter an address:", value ="Skaldevägen 60")
+    POI_radius=st.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
+
+    
+# cont_address=st.container(width=300)
+# address = col_address.text_input("Enter an address:", value ="Skaldevägen 60")
+# POI_radius=col_address.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
 
 # If user enters an address => find latitude and longitude
-if st.sidebar.button("Go!"):
+if st.button("Go!"):
     
 
     if address:
