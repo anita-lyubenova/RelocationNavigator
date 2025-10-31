@@ -89,22 +89,33 @@ nopad = """<style>
 div[data-testid = 'stMainBlockContainer']{padding: 0rem 0rem 0rem 1rem;} 
 </style>
 """
-
 st.markdown(nopad, unsafe_allow_html=True)
 
+st.markdown(
+    """
+    <style>
+    /* Make the label and pill buttons inline */
+    div.stButtonGroup {
+        display: flex !important;       /* set label to be on the same line as buttons */
+        align-items: top;            /* vertical align label and pills */
+        gap: 10px;                      /* space between label and buttons */
+    }
+    
+    div.stButtonGroup label {
+        white-space: nowrap !important; /* prevent label from breaking */
+        flex-shrink: 0;                 /* don’t allow the label to shrink */
+        margin-bottom: 0 !important;
+    }
+    
+    div.stButtonGroup label div[data-testid='stMarkdownContainer'] p {
+        font-weight: bold !important;
+        margin: 0;  /* optional: remove default margin */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-vertical_pills = """<style>
-div[data-testid = 'stMarkdownContainer']{display: grid;} 
-</style>
-"""
-
-vertical_pills = """
-<style>
-div[role='group'][data-baseweb='button-group'] {display: grid !important;}
-</style>
-"""
-
-# stMarkdownContainer
 
 # Sidebar ----------------------------------------------------
 # st.sidebar.markdown("## Sidebar")
@@ -120,12 +131,26 @@ with col_address:
     POI_radius=st.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
 
 with col_features:
-    ms_input_food = st.pills(label = "Food & Drinks",
-                             options = ms_index.loc[ms_index["Category"] == "Food & Drinks",'Multiselect'],
-                             key="poi_food_input",
-                             selection_mode="multi")
-    st.markdown(vertical_pills, unsafe_allow_html=True)
+   
     
+    selected_values = {}
+
+    # Loop through all categories
+    for category in ms_index["Category"].unique():
+        options = ms_index.loc[ms_index["Category"] == category, "Multiselect"].dropna().unique().tolist()
+        
+        # Dynamically generate a pills input for each category
+        selected = st.pills(
+            label=category,
+            options=options,
+            key=f"poi_{category.replace(' ', '_')}_input",  # unique key
+            selection_mode="multi"
+        )
+        
+        # Store the selected values
+        selected_values[category] = selected
+
+    st.write(selected_values)
 
     #PoI_input = st.multiselect(label="What services are important?", options = ms_index['Multiselect'], key = "poi_select")
 
