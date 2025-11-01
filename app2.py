@@ -149,9 +149,8 @@ with col_features:
         # Store the selected values
         selected_poi.extend(selected)
         
-
-    #PoI_input = st.multiselect(label="What services are important?", options = ms_index['Multiselect'], key = "poi_select")
-tags=ms_index[ms_index['Multiselect'].isin(selected_poi)][["key", "value"]].groupby("key")["value"].apply(list).to_dict()
+if selected_poi:
+    poi_tags=ms_index[ms_index['Multiselect'].isin(selected_poi)][["key", "value"]].groupby("key")["value"].apply(list).to_dict()
 
 #Built environment: get POIs within 500m
 tags0 = {
@@ -175,9 +174,8 @@ if st.button("Go!"):
             lat, lon = location.latitude, location.longitude
             st.write(f"Coordinates: {lat}, {lon}")
             
-            all_features = get_osm_features(lat, lon, tags0, POI_radius)
-            #ms_poi = get_osm_features(lat, lon, tags, POI_radius)
             
+            all_features = get_osm_features(lat, lon, tags0, POI_radius)
             #transform to long format
             all_features=melt_tags(all_features, tags0.keys())
             # Pie chart------------------------------------------------------------------------------------------------------
@@ -229,6 +227,7 @@ if st.button("Go!"):
                 fill=False,
                 weight=2            
                 ).add_to(m)
+            
             landuse_layer = folium.FeatureGroup(name="Land use distribution")
             
             folium.GeoJson(
@@ -246,16 +245,23 @@ if st.button("Go!"):
             ).add_to(landuse_layer)
             
             landuse_layer.add_to(m)
+            
+            if selected_poi:
+                ms_poi = get_osm_features(lat, lon, poi_tags, POI_radius)
+                st.write(ms_poi)
+                
+                poi_layer = folium.FeatureGroup(name="Points of Interest")
+                
                 
             folium.LayerControl().add_to(m)
             
-            #st_folium(m)
+            
             col1,col2 = st.columns(2, gap="small", border=True)    
             
             with col1:
                 st.subheader("Map with Points of interest")
                 st_folium(m)
-                #st.write(ms_poi)
+                
             with col2:
                 st.subheader("Land use distribution")
                 st.plotly_chart(fig,
@@ -263,9 +269,6 @@ if st.button("Go!"):
                                 key="landuse_pie",
                                 config = {'height': fig_height})
                 
-
-
-        
 
 
         else:
