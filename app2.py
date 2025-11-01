@@ -66,6 +66,9 @@ color_lookup = {
     for i, cat in enumerate(sorted(unique_cats))
 }
 
+list(pie_index)
+color_lookup.get(pie_index['pie_cat'][1], "gray")
+
 ms_index  = load_pie_index("Multiselect")
 ms_index = ms_index[ms_index['Multiselect'].notna()]
 
@@ -173,7 +176,7 @@ if st.button("Go!"):
             st.write(f"Coordinates: {lat}, {lon}")
             
             all_features = get_osm_features(lat, lon, tags0, POI_radius)
-            ms_poi = get_osm_features(lat, lon, tags, POI_radius)
+            #ms_poi = get_osm_features(lat, lon, tags, POI_radius)
             
             #transform to long format
             all_features=melt_tags(all_features, tags0.keys())
@@ -226,33 +229,23 @@ if st.button("Go!"):
                 fill=False,
                 weight=2            
                 ).add_to(m)
+            landuse_layer = folium.FeatureGroup(name="Land use distribution")
             
-            for index,key in enumerate(keys):
-                print(key)
-                if key in keys:
-                    polygon_layer = folium.FeatureGroup(name=key)
-                    #fillcolor = px.colors.qualitative.Set3[index]
-                    
-                    fillcolor = color_lookup.get(key, 'gray') 
-                    print(fillcolor)
+            folium.GeoJson(
+                data=pie_data0,  # All data at once
+                style_function=lambda feature: {
+                    "fillColor": color_lookup.get(feature["properties"]["pie_cat"]),
+                    "color": "black",
+                    "weight": 0.3,
+                    "fillOpacity": 0.5,
+                },
+                popup=folium.GeoJsonPopup(
+                    fields=["pie_cat", "key", "value"],
+                    aliases=["In pie chart", "OSM key", "OSM value"]
+                )
+            ).add_to(landuse_layer)
             
-                    # Filter POIs for this key
-                    filtered = pie_data0[pie_data0['pie_cat']==key]
-                    folium.GeoJson(data=filtered, 
-                                       style_function=lambda x, color=fillcolor: {"fillColor": color,
-                                                                 'color': 'black',
-                                                                 'weight': 0.3,
-                                                                 'fillOpacity': 0.5
-                                                                },
-                                       popup=folium.GeoJsonPopup(
-                                            fields=['pie_cat' ,'key', 'value'],
-                                            aliases=['In pie chart', 'OSM key', 'OSM value']
-                                        )).add_to(polygon_layer)
-            
-                    polygon_layer.add_to(m)
-                  
-                else:
-                    continue
+            landuse_layer.add_to(m)
                 
             folium.LayerControl().add_to(m)
             
@@ -262,7 +255,7 @@ if st.button("Go!"):
             with col1:
                 st.subheader("Map with Points of interest")
                 st_folium(m)
-                st.write(ms_poi)
+                #st.write(ms_poi)
             with col2:
                 st.subheader("Land use distribution")
                 st.plotly_chart(fig,
