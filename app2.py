@@ -81,7 +81,7 @@ ms_index = ms_index[ms_index['Multiselect'].notna()]
 ms_cats = ms_index['Category'].unique()
 
 
-fig_height=650
+fig_height=1000
 # -- Set page config
 apptitle = 'Navigator'
 st.set_page_config(page_title=apptitle,
@@ -256,9 +256,8 @@ if st.button("Go!"):
                 ms_poi = get_osm_features(lat, lon, poi_tags, POI_radius)
                 poi_data = melt_tags(ms_poi, poi_tags.keys()).reset_index().merge(ms_poi.reset_index()[["id", "name"]], on="id").merge(ms_index[["Category", "Multiselect", "key", "value", "color", "icon"]], on=["key", "value"])
                 poi_data.loc[poi_data['name'].isna(), 'name']="Unnamed"
-                
-                st.write(poi_data)
-                
+                 
+                #add layer with PoI markers to map                              
                 poi_layer = folium.FeatureGroup(name="Points of Interest")
                 
                 for idx, row in poi_data.iterrows():
@@ -284,7 +283,7 @@ if st.button("Go!"):
             
             with col1:
                 st.subheader("Map with Points of interest")
-                st_folium(m)
+                st_folium(m,use_container_width=True)
                 
             with col2:
                 st.subheader("Land use distribution")
