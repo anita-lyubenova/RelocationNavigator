@@ -68,17 +68,15 @@ def melt_tags(gdf, tag_keys):
 
 #get pie index 
 pie_index = load_pie_index("pie_index")
+
 #Create a color to category mapping
 unique_cats = pie_index["pie_cat"].unique()
-#palette = px.colors.qualitative.Pastel1+px.colors.qualitative.Pastel2
-#palette = plt.colormaps.get('Set3').colors
 palette = px.colors.qualitative.Light24
 color_lookup = {
     cat: palette[i % len(palette)]
     for i, cat in enumerate(sorted(unique_cats))
 }
 
-list(pie_index)
 color_lookup.get(pie_index['pie_cat'][1], "gray")
 
 ms_index  = load_pie_index("Multiselect")
@@ -140,8 +138,8 @@ col_address, col_features = cont_input.columns(spec= [0.3, 0.7], gap="small", bo
 with col_address:
     address = st.text_input("Enter an address:", value ="Skaldevägen 60")
     POI_radius=st.slider('Show PoIs within:', min_value=100, max_value=2000, value=500)
-    POI_radius_elevation=st.slider('Show elevation profile within:', min_value=100, max_value=5000, value=500)
     
+    no_landuse_input = st.checkbox("Show land use distribution (might take more time)", value =True)
 
 with col_features:
     st.write("Select points of interest you'd like to have in the area")
@@ -188,51 +186,8 @@ if st.button("Go!"):
             lat, lon = location.latitude, location.longitude
             st.write(f"Coordinates: {lat}, {lon}")
             
+            #Map --------------------------------------------------------------
             
-            all_features = get_osm_features(lat, lon, tags0, POI_radius)
-            #transform to long format
-            all_features=melt_tags(all_features, tags0.keys())
-            
-            # Pie chart data ------------------------------------------------------------------------------------------------------
-            # get only polygons
-            polygon_features = all_features[all_features.geometry.geom_type.isin(["Polygon", "MultiPolygon"])]
-            
-            clipped=clip_to_circle(gdf=polygon_features, lat=lat, lon=lon, radius=POI_radius)
-            
-            #Copmute square meter area per key and value-----------------------
-            # Project to metric CRS for accurate areas
-            proj_crs = clipped.estimate_utm_crs()
-            clipped = clipped.to_crs(proj_crs)
-            clipped["area_m2"] = clipped.geometry.area
-            
-            pie_data0 = clipped.merge(pie_index, on=["key", "value"], how="left")
-            #pie_data0['pie_cat'] =pie_data0['pie_cat'].fillna('other')
-            pie_data0 =pie_data0[pie_data0['pie_cat'].notna()] #remove polygons that are not in the pie index
-            
-            pie_data = pie_data0.groupby(["pie_cat"]).agg(
-                total_area_m2 = ("area_m2", "sum"),
-                values_included=("value", lambda x: ", ".join(sorted(x.unique())))).reset_index() #concantenate all values within the pie_category
-
-            pie_data["values_included"] = (pie_data["values_included"].str.replace("_", " ")) #remove underscores from the column (for the popup)
-            
-            #pie chart----------------------------------------------------
-            fig = px.pie(
-                pie_data,
-                names="pie_cat",
-                values="total_area_m2",
-                hover_data=["values_included"],
-                color='pie_cat',
-                color_discrete_map=color_lookup,
-                hole=.5)
-            fig.update_traces(
-                textinfo="percent+label",
-                pull=[0.05]*len(pie_data),
-                hovertemplate="<b>%{label}</b><br>%{value:,.0f} m²<br>%{customdata}")
-            
-            fig.update_layout(height=fig_height)
-         
-           #Map --------------------------------------------------------------
-            keys = pie_data.sort_values("total_area_m2", ascending=False)["pie_cat"].unique()
             m = folium.Map(location=[lat, lon], zoom_start=14)         
             # Add address marker
             folium.Marker([lat, lon], popup=address, icon=folium.Icon(color='red', icon='home')).add_to(m)
@@ -243,29 +198,74 @@ if st.button("Go!"):
                 fill=False,
                 weight=2.5            
                 ).add_to(m)
+             
+            if no_landuse_input:
+                all_features = get_osm_features(lat, lon, tags0, POI_radius)
+                #transform to long format
+                all_features=melt_tags(all_features, tags0.keys())
+                
+                # Pie chart data ------------------------------------------------------------------------------------------------------
+                # get only polygons
+                polygon_features = all_features[all_features.geometry.geom_type.isin(["Polygon", "MultiPolygon"])]
+                
+                clipped=clip_to_circle(gdf=polygon_features, lat=lat, lon=lon, radius=POI_radius)
+                
+                #Copmute square meter area per key and value-----------------------
+                # Project to metric CRS for accurate areas
+                proj_crs = clipped.estimate_utm_crs()
+                clipped = clipped.to_crs(proj_crs)
+                clipped["area_m2"] = clipped.geometry.area
+                
+                pie_data0 = clipped.merge(pie_index, on=["key", "value"], how="left")
+                #pie_data0['pie_cat'] =pie_data0['pie_cat'].fillna('other')
+                pie_data0 =pie_data0[pie_data0['pie_cat'].notna()] #remove polygons that are not in the pie index
+                
+                pie_data = pie_data0.groupby(["pie_cat"]).agg(
+                    total_area_m2 = ("area_m2", "sum"),
+                    values_included=("value", lambda x: ", ".join(sorted(x.unique())))).reset_index() #concantenate all values within the pie_category
+    
+                pie_data["values_included"] = (pie_data["values_included"].str.replace("_", " ")) #remove underscores from the column (for the popup)
+                
+                #pie chart----------------------------------------------------
+                fig = px.pie(
+                    pie_data,
+                    names="pie_cat",
+                    values="total_area_m2",
+                    hover_data=["values_included"],
+                    color='pie_cat',
+                    color_discrete_map=color_lookup,
+                    hole=.5)
+                fig.update_traces(
+                    textinfo="percent+label",
+                    pull=[0.05]*len(pie_data),
+                    hovertemplate="<b>%{label}</b><br>%{value:,.0f} m²<br>%{customdata}")
+                
+                fig.update_layout(height=fig_height)
+                
+                ##Land use layer
+                keys = pie_data.sort_values("total_area_m2", ascending=False)["pie_cat"].unique()
             
-            ##Land use layer
-            landuse_layer = folium.FeatureGroup(name="Land use distribution")
-            
-            folium.GeoJson(
-                data=pie_data0,  # All data at once
-                style_function=lambda feature: {
-                    "fillColor": color_lookup.get(feature["properties"]["pie_cat"]),
-                    "color": "black",
-                    "weight": 0.3,
-                    "fillOpacity": 0.5,
-                },
-                popup=folium.GeoJsonPopup(
-                    fields=["pie_cat", "key", "value"],
-                    aliases=["In pie chart", "OSM key", "OSM value"]
-                )
-            ).add_to(landuse_layer)
-            
-            landuse_layer.add_to(m)
+                landuse_layer = folium.FeatureGroup(name="Land use distribution")
+                
+                folium.GeoJson(
+                    data=pie_data0,  # All data at once
+                    style_function=lambda feature: {
+                        "fillColor": color_lookup.get(feature["properties"]["pie_cat"]),
+                        "color": "black",
+                        "weight": 0.3,
+                        "fillOpacity": 0.5,
+                    },
+                    popup=folium.GeoJsonPopup(
+                        fields=["pie_cat", "key", "value"],
+                        aliases=["In pie chart", "OSM key", "OSM value"]
+                    )
+                ).add_to(landuse_layer)
+                
+                landuse_layer.add_to(m)
             
             # Elevation data ----------------------------------------------------------------------------------------
             # 1. Get the street network (nodes + edges)
-            G = ox.graph_from_point((lat, lon), dist=POI_radius_elevation, network_type='walk')
+            G = ox.graph_from_point((lat, lon), dist=POI_radius, network_type='walk')
             
             # 2. Extract nodes only
             nodes, edges = ox.graph_to_gdfs(G)
