@@ -11,7 +11,6 @@ import networkx as nx
 #import xlrd
 #from folium import GeoJson, GeoJsonTooltip
 
-import matplotlib
 import requests
 import time
 import branca.colormap as cm# 8. Create a linear color scale for grade_abs
@@ -270,10 +269,16 @@ if st.button("Go!"):
             # 2. Extract nodes only
             nodes, edges = ox.graph_to_gdfs(G)
             
-            # 3. Prepare node coordinates
+            
+            # # 3. Prepare node coordinates
             coords = list(zip(nodes.y, nodes.x))
             batch_size = 100  # OpenTopoData can only take limited locations per request
+            batches = [coords[i:i+batch_size] for i in range(0, len(coords), batch_size)]
             elevations = []
+            
+            progress_text = "Fetching elevation data..."
+            progress_elevation= st.progress(0, text=progress_text)
+            total_batches = (len(coords) + batch_size - 1) // batch_size  # ceil division
             
             # 4. Query the OpenTopoData API in batches
             for i in range(0, len(coords), batch_size):
@@ -287,6 +292,38 @@ if st.button("Go!"):
                 else:
                     elevations.extend([None]*len(batch))
                 time.sleep(1)  # avoid rate limit
+                progress_pct = int((i+1)/total_batches ) #int(((i+1)/total_batches) * 100)
+                progress_elevation.progress(progress_pct, text=f"{progress_text} ({progress_pct}%)")
+                
+            progress_elevation.empty()
+            
+            
+            
+            
+            # # --- Fetch elevations in batches ---
+            # for i in range(total_batches):
+            #     batch = coords[i*batch_size : (i+1)*batch_size]
+            #     locations = "|".join([f"{lat},{lon}" for lat, lon in batch])
+            #     url = f"https://api.opentopodata.org/v1/srtm90m?locations={locations}"
+                
+            #     # Make request
+            #     r = requests.get(url)
+            #     if r.status_code == 200:
+            #         results = r.json().get('results', [])
+            #         # Make sure to preserve order and fill missing elevations with None
+            #         batch_elevs = [res.get('elevation') if res else None for res in results]
+            #         elevations.extend(batch_elevs)
+            #     else:
+            #         elevations.extend([None]*len(batch))
+                
+            #     # Update Streamlit progress
+            #     progress_pct = int(((i+1)/total_batches) * 100)
+            #     my_bar.progress(progress_pct, text=f"{progress_text} ({progress_pct}%)")
+                
+            #     time.sleep(1)  # respect API rate limit
+            
+            # # Remove the progress bar
+            # my_bar.empty()
             
             # 5. Add node elevations
             nodes["elevation"] = elevations
@@ -303,7 +340,7 @@ if st.button("Go!"):
             # 6. Compute edge grades (uses node elevations)
             G = ox.add_edge_grades(G, add_absolute=True)
             edges = ox.graph_to_gdfs(G, nodes=False)
-            grades = edges['grade_abs'].dropna()  # remove any NaN just in case
+            grades = edges['grade_abs'].dropna()  # remove any NaN 
 
             #m_elev = folium.Map(location=[lat, lon], zoom_start=14) 
             elevation_layer = folium.FeatureGroup(name="Street steepness")
@@ -396,15 +433,15 @@ if st.button("Go!"):
                 # st.write("Here you can see land use patterns, elevation profile and where your points of interest are located")
                 st_folium(m,use_container_width=True)
                 
-                # with st.popover("Degree reference values"):
-                #     st.markdown("""
-                #         - **0–2%**: Very flat street, easy to walk or bike  
-                #         - **2–5%**: Slight incline, barely noticeable  
-                #         - **5–8%**: Moderate slope, noticeable uphill effort  
-                #         - **8–12%**: Steep street, challenging for bikes or long walks  
-                #         - **>12%**: Very steep, strenuous; may be difficult for vehicles, bicycles, or accessibility
-                #         """)
-                # st.header("Nearest points of interest")
+                with st.popover("Degree reference values"):
+                    st.markdown("""
+                        - **0–2%**: Very flat street, easy to walk or bike  
+                        - **2–5%**: Slight incline, barely noticeable  
+                        - **5–8%**: Moderate slope, noticeable uphill effort  
+                        - **8–12%**: Steep street, challenging for bikes or long walks  
+                        - **>12%**: Very steep, strenuous; may be difficult for vehicles, bicycles, or accessibility
+                        """)
+                st.header("Nearest points of interest")
                         
                 if 'resdf' in locals() and not resdf.empty:
                     st.dataframe(resdf, key="nearest_pois")
@@ -414,10 +451,15 @@ if st.button("Go!"):
                 
             with col2:
                 st.subheader("Land use distribution")
-                st.plotly_chart(fig,
-                                use_container_width=True,
-                                key="landuse_pie",
-                                config = {'height': fig_height})
+                
+                if 'fig' in locals():
+                    st.plotly_chart(fig,
+                                    use_container_width=True,
+                                    key="landuse_pie",
+                                    config = {'height': fig_height})
+                else:
+                    st.info("No landuse characteristics were obtained. If you want to see the landuse distribution, mark the checkbox")
+               
                 
            
             
