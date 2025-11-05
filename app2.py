@@ -239,11 +239,12 @@ if st.button("Go!"):
             folium.Circle(
                 location=[lat, lon],
                 radius=POI_radius,  # in meters
-                color='red',       
+                color='black',       
                 fill=False,
-                weight=2            
+                weight=2.5            
                 ).add_to(m)
             
+            ##Land use layer
             landuse_layer = folium.FeatureGroup(name="Land use distribution")
             
             folium.GeoJson(
@@ -261,6 +262,65 @@ if st.button("Go!"):
             ).add_to(landuse_layer)
             
             landuse_layer.add_to(m)
+            
+            # Elevation data ----------------------------------------------------------------------------------------
+            # 1. Get the street network (nodes + edges)
+            G = ox.graph_from_point((lat, lon), dist=POI_radius_elevation, network_type='walk')
+            
+            # 2. Extract nodes only
+            nodes, edges = ox.graph_to_gdfs(G)
+            
+            # 3. Prepare node coordinates
+            coords = list(zip(nodes.y, nodes.x))
+            batch_size = 100  # OpenTopoData can only take limited locations per request
+            elevations = []
+            
+            # 4. Query the OpenTopoData API in batches
+            for i in range(0, len(coords), batch_size):
+                batch = coords[i:i+batch_size]
+                locations = "|".join([f"{lat},{lon}" for lat, lon in batch])
+                url = f"https://api.opentopodata.org/v1/srtm90m?locations={locations}"
+                r = requests.get(url)
+                if r.status_code == 200:
+                    results = r.json().get('results', [])
+                    elevations.extend([r.get('elevation', None) for r in results])
+                else:
+                    elevations.extend([None]*len(batch))
+                time.sleep(1)  # avoid rate limit
+            
+            # 5. Add node elevations
+            nodes["elevation"] = elevations
+            
+            # Replace None or NaN with median (fallback)
+            nodes["elevation"] = pd.to_numeric(nodes["elevation"], errors="coerce")
+            median_elev = nodes["elevation"].median()
+            nodes["elevation"].fillna(median_elev, inplace=True)
+            
+            # 5. Push node elevations back to the graph
+            for node_id, elev in zip(nodes.index, nodes["elevation"]):
+                G.nodes[node_id]["elevation"] = elev
+            
+            # 6. Compute edge grades (uses node elevations)
+            G = ox.add_edge_grades(G, add_absolute=True)
+            edges = ox.graph_to_gdfs(G, nodes=False)
+            grades = edges['grade_abs'].dropna()  # remove any NaN just in case
+
+            #m_elev = folium.Map(location=[lat, lon], zoom_start=14) 
+            elevation_layer = folium.FeatureGroup(name="Street steepness")
+            
+            max_grade = 0.15 #edges['grade_abs'].max()
+            colormap = cm.LinearColormap(["yellow","orange",'red', 'purple', 'blue'], vmin=0, vmax=max_grade)
+            colormap.caption = 'Street Grade (%)'
+            
+            # 10. Add edges as polylines with color based on grade
+            for _, row in edges.iterrows():
+                coords = [(y, x) for x, y in row.geometry.coords]
+                color = colormap(row['grade_abs'])
+                folium.PolyLine(coords, color=color, weight=3, opacity=0.8).add_to(elevation_layer)
+            
+            # 11. Add the color scale
+            colormap.add_to(m)
+            elevation_layer.add_to(m)
             
             if selected_poi:
                 ms_poi = get_osm_features(lat, lon, poi_tags, POI_radius)
@@ -323,70 +383,29 @@ if st.button("Go!"):
                 resdf=pd.DataFrame(results)
                 
             
+           
+            
+            
+            
             folium.LayerControl().add_to(m)
-            
-            # Elevation data ----------------------------------------------------------------------------------------
-            # 1. Get the street network (nodes + edges)
-            G = ox.graph_from_point((lat, lon), dist=POI_radius_elevation, network_type='walk')
-            
-            # 2. Extract nodes only
-            nodes, edges = ox.graph_to_gdfs(G)
-            
-            # 3. Prepare node coordinates
-            coords = list(zip(nodes.y, nodes.x))
-            batch_size = 100  # OpenTopoData can only take limited locations per request
-            elevations = []
-            
-            # 4. Query the OpenTopoData API in batches
-            for i in range(0, len(coords), batch_size):
-                batch = coords[i:i+batch_size]
-                locations = "|".join([f"{lat},{lon}" for lat, lon in batch])
-                url = f"https://api.opentopodata.org/v1/srtm90m?locations={locations}"
-                r = requests.get(url)
-                if r.status_code == 200:
-                    results = r.json().get('results', [])
-                    elevations.extend([r.get('elevation', None) for r in results])
-                else:
-                    elevations.extend([None]*len(batch))
-                time.sleep(1)  # avoid rate limit
-            
-            # 5. Add node elevations
-            nodes["elevation"] = elevations
-            
-            # Replace None or NaN with median (fallback)
-            nodes["elevation"] = pd.to_numeric(nodes["elevation"], errors="coerce")
-            median_elev = nodes["elevation"].median()
-            nodes["elevation"].fillna(median_elev, inplace=True)
-            
-            # 5. Push node elevations back to the graph
-            for node_id, elev in zip(nodes.index, nodes["elevation"]):
-                G.nodes[node_id]["elevation"] = elev
-            
-            # 6. Compute edge grades (uses node elevations)
-            G = ox.add_edge_grades(G, add_absolute=True)
-            edges = ox.graph_to_gdfs(G, nodes=False)
-            grades = edges['grade_abs'].dropna()  # remove any NaN just in case
-
-            m_elev = folium.Map(location=[lat, lon], zoom_start=14)    
-            max_grade = 0.15 #edges['grade_abs'].max()
-            colormap = cm.LinearColormap(["yellow","orange",'red', 'purple', 'blue'], vmin=0, vmax=max_grade)
-            colormap.caption = 'Street Grade (%)'
-            
-            # 10. Add edges as polylines with color based on grade
-            for _, row in edges.iterrows():
-                coords = [(y, x) for x, y in row.geometry.coords]
-                color = colormap(row['grade_abs'])
-                folium.PolyLine(coords, color=color, weight=3, opacity=0.8).add_to(m_elev)
-            
-            # 11. Add the color scale
-            colormap.add_to(m_elev)
-            
             
             col1,col2 = st.columns(2, gap="small", border=True)    
             
             with col1:
-                st.subheader("Map with Points of interest")
+                # st.subheader("Map")
+                # st.write("Here you can see land use patterns, elevation profile and where your points of interest are located")
                 st_folium(m,use_container_width=True)
+                
+                # with st.popover("Degree reference values"):
+                #     st.markdown("""
+                #         - **0–2%**: Very flat street, easy to walk or bike  
+                #         - **2–5%**: Slight incline, barely noticeable  
+                #         - **5–8%**: Moderate slope, noticeable uphill effort  
+                #         - **8–12%**: Steep street, challenging for bikes or long walks  
+                #         - **>12%**: Very steep, strenuous; may be difficult for vehicles, bicycles, or accessibility
+                #         """)
+                # st.header("Nearest points of interest")
+                        
                 if 'resdf' in locals() and not resdf.empty:
                     st.dataframe(resdf, key="nearest_pois")
                 else:
@@ -400,18 +419,7 @@ if st.button("Go!"):
                                 key="landuse_pie",
                                 config = {'height': fig_height})
                 
-            st.header("Elevation")
-            st.write("Here you can see how hilly it is around the address")
-            with st.popover("Open popover"):
-                st.markdown("""
-                    - **0–2%**: Very flat street, easy to walk or bike  
-                    - **2–5%**: Slight incline, barely noticeable  
-                    - **5–8%**: Moderate slope, noticeable uphill effort  
-                    - **8–12%**: Steep street, challenging for bikes or long walks  
-                    - **>12%**: Very steep, strenuous; may be difficult for vehicles, bicycles, or accessibility
-                    """)
-            st_folium(m_elev,use_container_width=True)
-                
+           
             
                 
 
