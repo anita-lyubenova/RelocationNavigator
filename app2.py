@@ -82,7 +82,7 @@ ms_index = ms_index[ms_index['Multiselect'].notna()]
 ms_cats = ms_index['Category'].unique()
 
 
-fig_height=1000
+fig_height=700
 # -- Set page config
 apptitle = 'Navigator'
 st.set_page_config(page_title=apptitle,
@@ -135,6 +135,8 @@ col_address, col_features = cont_input.columns(spec= [0.3, 0.7], gap="small", bo
 with col_address:
     address = st.text_input("Enter an address:", value ="Skaldevägen 60")
     POI_radius=st.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
+    
+    
 
 with col_features:
     st.write("Select points of interest you'd like to have in the area")
@@ -214,7 +216,8 @@ if st.button("Go!"):
                 values="total_area_m2",
                 hover_data=["values_included"],
                 color='pie_cat',
-                color_discrete_map=color_lookup)
+                color_discrete_map=color_lookup,
+                hole=.5)
             fig.update_traces(
                 textinfo="percent+label",
                 pull=[0.05]*len(pie_data),
