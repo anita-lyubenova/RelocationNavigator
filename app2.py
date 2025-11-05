@@ -42,7 +42,13 @@ def clip_to_circle(gdf, lat, lon, radius):
 
 
 
+
 def melt_tags(gdf, tag_keys):
+    # keep onlt keys that exist in gdf
+    tag_keys = [k for k in tag_keys if k in gdf.columns]
+    if not tag_keys:
+        raise ValueError("None of the provided tag_keys exist in the GeoDataFrame.")
+
     melted = (
         gdf[tag_keys]
         .stack()
@@ -248,9 +254,27 @@ if st.button("Go!"):
             
             if selected_poi:
                 ms_poi = get_osm_features(lat, lon, poi_tags, POI_radius)
-                st.write(ms_poi)
+                poi_data = melt_tags(ms_poi, poi_tags.keys()).reset_index().merge(ms_poi.reset_index()[["id", "name"]], on="id").merge(ms_index[["Category", "Multiselect", "key", "value", "color", "icon"]], on=["key", "value"])
+                poi_data.loc[poi_data['name'].isna(), 'name']="Unnamed"
+                
+                st.write(poi_data)
                 
                 poi_layer = folium.FeatureGroup(name="Points of Interest")
+                
+                for idx, row in poi_data.iterrows():
+                    lon_, lat_ = row.geometry.centroid.xy
+                    folium.Marker(
+                        location=[lat_[0], lon_[0]],
+                        popup= f"<div style='font-size:12px; font-family:Arial; white-space:nowrap;'><b>{row.get("Category",'N/A').capitalize()}: </b>{row.get('Multiselect')}<br>{row.get('name', 'Unnamed')}",
+                        icon=folium.Icon(
+                            color=row['color'],
+                            icon=row['icon'].replace("fa-", "") if str(row['icon']).startswith("fa-") else row['icon'],
+                            prefix="fa" if str(row['icon']).startswith("fa-") else None
+                        )
+                        
+                        ).add_to(poi_layer)
+                         
+                poi_layer.add_to(m)
                 
                 
             folium.LayerControl().add_to(m)
