@@ -7,6 +7,7 @@ import geopandas as gpd
 from shapely.geometry import Point
 import pandas as pd
 import plotly.express as px
+import networkx as nx
 #import xlrd
 #from folium import GeoJson, GeoJsonTooltip
 
@@ -136,7 +137,7 @@ with col_address:
     POI_radius=st.slider('Show PoIs within X m', min_value=100, max_value=3000, value=500)
 
 with col_features:
-   
+    st.write("Select points of interest you'd like to have in the area")
     
     selected_poi = []
 
@@ -275,15 +276,58 @@ if st.button("Go!"):
                          
                 poi_layer.add_to(m)
                 
+                #Available PoI: ---------------------------------------------------------------------------------
+                G = ox.graph_from_point((lat, lon), dist=POI_radius, network_type='walk')
+                home_node = ox.nearest_nodes(G, lon, lat)
+                
+                #change crs to compute centroids of the polygons
+                p3857 = poi_data.to_crs(epsg=3857) 
+                p3857['centroide'] = p3857.geometry.centroid
+                p3857=p3857.set_geometry("centroide")
+
+                p4326=p3857.to_crs(epsg=4326)
+                
+                
+
+                results = []
+                
+                for cat in selected_poi:
+                   
+                    filtered = p4326[p4326["Multiselect"] == cat]
+                    if filtered.empty:
+                        results.append({"Category": cat, "Present": "No", "Name of nearest": None, "Distance to nearest (m)": None})
+                        continue
+                
+                    # map each POI geometry to nearest node
+                    filtered = filtered.copy()
+                   
+                    filtered["node"] = filtered.geometry.apply(lambda geom: ox.nearest_nodes(G, geom.x, geom.y))
+                    # compute walk distance for each
+                    filtered["walk_dist_m"] = filtered["node"].apply( lambda target_node: nx.shortest_path_length(G, home_node, target_node, weight='length'))
+                    
+                    # pick nearest by walking
+                    nearest = filtered.to_crs(epsg=4326).loc[filtered["walk_dist_m"].idxmin()]
+                    
+                    results.append({"Point of interest": cat,
+                                    "Present": "Yes",
+                                    "Name of nearest": nearest["name"],
+                                    "Distance to nearest (m)": round(nearest["walk_dist_m"])
+                                   })
+                resdf=pd.DataFrame(results)
+                
                 
             folium.LayerControl().add_to(m)
-            
             
             col1,col2 = st.columns(2, gap="small", border=True)    
             
             with col1:
                 st.subheader("Map with Points of interest")
                 st_folium(m,use_container_width=True)
+                if 'resdf' in locals() and not resdf.empty:
+                    st.dataframe(resdf, key="nearest_pois")
+                else:
+                    st.info("No Points of interest selected.")
+                
                 
             with col2:
                 st.subheader("Land use distribution")
