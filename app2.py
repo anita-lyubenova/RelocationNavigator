@@ -98,11 +98,11 @@ st.title("Relocation Navigator")
 
 
 ## applying style
-nopad = """<style>
-div[data-testid = 'stMainBlockContainer']{padding: 0rem 0rem 0rem 1rem;} 
-</style>
-"""
-st.markdown(nopad, unsafe_allow_html=True)
+
+st.markdown("""<style>
+                div[data-testid = 'stMainBlockContainer']{padding: 0rem 0rem 0rem 1rem;} 
+                </style>
+                """, unsafe_allow_html=True)
 
 st.markdown(
     """
@@ -129,32 +129,41 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
 intro_text = " Relocation Navigator helps you explore neighborhoods by providing and visualizing information about the local streets, land use, and nearby points of interest. Home seekers, cyclists and pedestrians can get an overview of an unknown neighborhood to inform relocation or travel decisions.Open Street Map data is used to visualize land use patterns and to find amenities like schools, public transport, shops, leisure spots, etc. The app shows walking distances to selected points of interest. Street steepness and shortest distance to key amenities can indicate level of accessibility. "
  
 tab_intro, tab_map = st.tabs(["Introduction", "Explore"])
 with tab_intro:
-    st.markdown(textwrap.fill(text=intro_text, width=50),unsafe_allow_html=True)
-    # st.markdown("""
-                
-    # **Features include:**
-    # - **Street Network & Elevation:** Visualize street slopes (grades) color-coded by steepness.  
-    # - **Land Use Distribution:** See the proportion of parks, nature, residential, commercial,idustrial and other land uses.  
-    # - **Points of Interest:** Search for nearby amenities such as schools, shops, leisure spots, or any other POIs.  
-    # - **Accessibility & Distance:** Find the nearest selected points of interest and walking distances.  
+    #st.markdown(textwrap.fill(text=intro_text, width=50),unsafe_allow_html=True)
+    st.markdown("""
+    Relocation Navigator helps you explore neighborhoods by providing and visualizing information about the local \n\n
+    streets, land use, and nearby points of interest. Home seekers, cyclists and pedestrians can get an overview \n\n
+    of an unknown neighborhood to inform relocation or travel decisions.Open Street Map data is used to visualize \n\n
+    land use patterns and to find amenities like schools, public transport, shops, leisure spots, etc. The app shows  \n\n
+    walking distances to selected points of interest. Street steepness and shortest distance to key amenities can \n\n
+    indicate level of accessibility.
+    """)
+    st.markdown("---")
+    st.markdown("""
+    **Features include:**
+    - **Street Network & Elevation:** Visualize street slopes (grades) color-coded by steepness.  
+    - **Land Use Distribution:** See the proportion of parks, nature, residential, commercial,idustrial and other land uses.  
+    - **Points of Interest:** Search for nearby amenities such as schools, shops, leisure spots, or any other POIs.  
+    - **Accessibility & Distance:** Find the nearest selected points of interest and walking distances.  
 
-    # **How to use:**
-    # 1. Enter an address in the left panel.  
-    # 2. Select the radius around the address to explore.  
-    # 3. Choose which points of interest to include. (optional)  
-    # 4. Check the "Show land use distribution" box if you want additional land use info.  
-    # 5. Click **Go!** to generate the map, elevation layer, and POI information.  
-    # 6. Wait for fetching, processing and visualizing the data. Depending on the location, and the size of the radius, this may take a while
+    **How to use:**
+    1. Enter an address in the left panel.  
+    2. Select the radius around the address to explore.  
+    3. Choose which points of interest to include. (optional)  
+    4. Check the "Show land use distribution" box if you want additional land use info.  
+    5. Click **Go!** to generate the map, elevation layer, and POI information.  
+    6. Wait for fetching, processing and visualizing the data. Depending on the location, and the size of the radius, this may take a while
 
-    # The map shows:
-    # - Streets colored by slope (steepness)  
-    # - Land use polygons corresponding to the pie chart of land use distribution  
-    # - Markers for selected points of interest  
-    # """)
+    The map shows:
+    - Streets colored by slope (steepness)  
+    - Land use polygons corresponding to the pie chart of land use distribution  
+    - Markers for selected points of interest  
+    """)
     
     
 # Main --------------------------------------------------------
