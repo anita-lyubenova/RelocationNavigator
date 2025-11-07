@@ -97,17 +97,14 @@ st.title("Relocation Navigator")
 
 
 
-## applying style
-
-st.markdown("""<style>
-                div[data-testid = 'stMainBlockContainer']{padding: 0rem 0rem 0rem 1rem;} 
-                </style>
-                """, unsafe_allow_html=True)
 
 st.markdown(
     """
     <style>
-    /* Make the label and pill buttons inline */
+    /* No padding */
+    div[data-testid = 'stMainBlockContainer']{padding: 0rem 0rem 0rem 1rem;} 
+    
+   
     div.stButtonGroup {
         display: flex !important;       /* set label to be on the same line as buttons */
         align-items: top;            /* vertical align label and pills */
@@ -124,11 +121,16 @@ st.markdown(
         font-weight: bold !important;
         margin: 0;  /* optional: remove default margin */
     }
+    /* Add left margin to the tabs */
+    div[data-baseweb="tab-list"] {margin-left: 50px !important;}
+    
+    /* Add left padding to the tab content panels */
+        div[data-baseweb="tab-panel"] { padding-left: 50px !important;}
+    
     </style>
     """,
     unsafe_allow_html=True
 )
-
 
 intro_text = " Relocation Navigator helps you explore neighborhoods by providing and visualizing information about the local streets, land use, and nearby points of interest. Home seekers, cyclists and pedestrians can get an overview of an unknown neighborhood to inform relocation or travel decisions.Open Street Map data is used to visualize land use patterns and to find amenities like schools, public transport, shops, leisure spots, etc. The app shows walking distances to selected points of interest. Street steepness and shortest distance to key amenities can indicate level of accessibility. "
  
